@@ -1,6 +1,6 @@
 # lmsys-optimize-usage
 
-The `lmsys-optimize-usage` userscript is designed to optimize the user experience on the [LMSYS chat platform](https://chat.lmsys.org/). It introduces several enhancements that streamline the chat interface by removing unnecessary elements, increasing the output token count, and automating the selection of chat settings.
+The `lmsys-optimize-usage` userscript is designed to optimize the user experience on the [chat.lmsys](https://chat.lmsys.org/). It introduces several enhancements that streamline the chat interface by removing unnecessary elements, increasing the output token count, and automating the selection of chat settings.
 
 ## Display
 
@@ -19,6 +19,7 @@ The `lmsys-optimize-usage` userscript is designed to optimize the user experienc
 - **Auto-Switch to Direct Chat**: It automatically switches the interface to direct chat mode.
 - **Auto-Switch Model**: This script changes the chat model to "gpt-4-turbo" upon loading the page.
 - **Remove Unnecessary Elements**: It removes unwanted notices and components from the chat interface to provide a cleaner user experience.
+- **Keep Connection**: Maintain a persistent WebSocket connection to avoid disconnections.
 
 ## Installation
 

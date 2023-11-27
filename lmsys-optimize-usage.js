@@ -1,14 +1,25 @@
 // ==UserScript==
 // @name         lmsys-enhancer
 // @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  Optimize page experience (Increase output token count + Auto-switch to direct chat + Auto-switch model)
+// @version      0.3
+// @description  Optimize your experience on the chat.lmsys.org with the `lmsys-enhancer` Tampermonkey script.
 // @author       joshlee
 // @match        https://chat.lmsys.org/
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=lmsys.org
 // @grant        none
 // @license      MIT
 // ==/UserScript==
+
+const scriptConfig = {
+  model: "gpt-4-turbo",
+  wsUrl: "wss://chat.lmsys.org/queue/join",
+  keepConnectionInterval: 120 * 1000,
+  keepConnectionTimeout: 30 * 1000,
+  autoCleanBlankDialogInterval: 3000,
+  sessionHash: "",
+};
+
+const originalSend = WebSocket.prototype.send;
 
 function removeUselessElements() {
   // Remove unnecessary notices and components
@@ -49,42 +60,65 @@ function changeModel(model) {
   );
 }
 
+function hackWsSend(data) {
+  const d = JSON.parse(data);
+  // get session_hash
+  if (d.session_hash) {
+    scriptConfig.sessionHash = d.session_hash;
+    console.log("🤗 session_hash:", d.session_hash);
+  }
+  originalSend.call(this, data);
+}
+
+function autoCleanBlankDialog() {
+  setInterval(function () {
+    var elements = document.querySelectorAll('div[data-testid="user"]');
+    elements.forEach(function (element) {
+      if (element.textContent.trim() === "") {
+        element.parentNode.removeChild(element);
+      }
+    });
+  }, scriptConfig.autoCleanBlankDialogInterval);
+}
+
+function keepConnection() {
+  const createWebSocket = function () {
+    const ws = new WebSocket(scriptConfig.wsUrl);
+    ws.onmessage = function (event) {
+      // console.log("Received:", event.data);
+      const data = JSON.parse(event.data);
+
+      if (data.msg === "send_hash") {
+        ws.send(
+          JSON.stringify({
+            fn_index: 39,
+            session_hash: scriptConfig.sessionHash,
+          })
+        );
+      } else if (data.msg === "send_data") {
+        const sendData = {
+          data: [null, scriptConfig.model, " "],
+          event_data: null,
+          fn_index: 39,
+          session_hash: scriptConfig.sessionHash,
+        };
+        ws.send(JSON.stringify(sendData));
+      }
+    };
+  };
+  createWebSocket();
+  setInterval(createWebSocket, scriptConfig.keepConnectionInterval);
+}
+
 function optimizePage() {
   window.alert = null;
+  WebSocket.prototype.send = hackWsSend;
   document.querySelectorAll(".tab-nav.scroll-hide button")[2].click();
   removeUselessElements();
   setMaxOutputToken();
-  changeModel("gpt-4-turbo");
-
-  // Prevent sporadic convo resets
-  const ogAEL = EventTarget.prototype.addEventListener;
-  EventTarget.prototype.addEventListener = function (
-    type,
-    listener,
-    optionsOrUseCapture
-  ) {
-    let calledByOpenAI = false;
-    if (
-      (type == "focus" && this === unsafeWindow) ||
-      type == "visibilitychange"
-    ) {
-      const callStack = new Error().stack + "\n",
-        aelCaller = callStack.match(/-extension:\/\/.*\n(.+)/)?.[1];
-      calledByOpenAI = !aelCaller?.includes("-extension://");
-      if (calledByOpenAI && type == "visibilitychange") {
-        ogAEL.call(
-          this,
-          type,
-          function (event) {
-            if (document.visibilityState != "visible")
-              listener.call(this, event);
-          },
-          optionsOrUseCapture
-        );
-      }
-    }
-    if (!calledByOpenAI) ogAEL.apply(this, arguments);
-  };
+  changeModel(scriptConfig.model);
+  autoCleanBlankDialog();
+  setTimeout(keepConnection, scriptConfig.keepConnectionTimeout);
 }
 
 (function main() {
