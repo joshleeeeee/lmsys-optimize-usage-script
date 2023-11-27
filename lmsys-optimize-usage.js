@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         lmsys-enhancer
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  Optimize page experience (Increase output token count + Auto-switch to direct chat + Auto-switch model)
 // @author       joshlee
 // @match        https://chat.lmsys.org/
@@ -15,13 +15,17 @@ function removeUselessElements() {
   document
     .querySelectorAll("#notice_markdown")
     .forEach((elem) => elem.remove());
-  const componentToRemove = document.querySelector("#component-93");
+  let componentToRemove = document.querySelector("#component-93");
+  if (componentToRemove) componentToRemove.remove();
+  componentToRemove = document.querySelector("#component-83");
   if (componentToRemove) componentToRemove.remove();
 }
 
 function setMaxOutputToken(maxValue = 4096) {
   // Set the maximum token output to the desired value
-  const maxOutputTokenInputs = document.querySelectorAll("#component-91 input");
+  const maxOutputTokenInputs = document.querySelectorAll(
+    "#component-100 input"
+  );
   if (maxOutputTokenInputs.length >= 2) {
     maxOutputTokenInputs[1].max = String(maxValue);
     maxOutputTokenInputs[0].value = String(maxValue);
@@ -35,7 +39,7 @@ function setMaxOutputToken(maxValue = 4096) {
 }
 
 function changeModel(model) {
-  document.querySelector("#component-76 > label").click();
+  document.querySelector("#model_selector_row label").click();
   document.querySelector(`li[data-value=${model}]`).dispatchEvent(
     new MouseEvent("mousedown", {
       view: window,
@@ -51,6 +55,36 @@ function optimizePage() {
   removeUselessElements();
   setMaxOutputToken();
   changeModel("gpt-4-turbo");
+
+  // Prevent sporadic convo resets
+  const ogAEL = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function (
+    type,
+    listener,
+    optionsOrUseCapture
+  ) {
+    let calledByOpenAI = false;
+    if (
+      (type == "focus" && this === unsafeWindow) ||
+      type == "visibilitychange"
+    ) {
+      const callStack = new Error().stack + "\n",
+        aelCaller = callStack.match(/-extension:\/\/.*\n(.+)/)?.[1];
+      calledByOpenAI = !aelCaller?.includes("-extension://");
+      if (calledByOpenAI && type == "visibilitychange") {
+        ogAEL.call(
+          this,
+          type,
+          function (event) {
+            if (document.visibilityState != "visible")
+              listener.call(this, event);
+          },
+          optionsOrUseCapture
+        );
+      }
+    }
+    if (!calledByOpenAI) ogAEL.apply(this, arguments);
+  };
 }
 
 (function main() {
