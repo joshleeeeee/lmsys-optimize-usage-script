@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         lmsys-enhancer
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.5
 // @description  Optimize your experience on the chat.lmsys.org with the `lmsys-enhancer` Tampermonkey script.
 // @author       joshlee
 // @match        https://chat.lmsys.org/
