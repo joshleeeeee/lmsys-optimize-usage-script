@@ -321,7 +321,7 @@ function toggleLastestSession() {
 
 function loadSessionHashHistory() {
   itemList.innerHTML = "";
-  const list = JSON.parse(localStorage.getItem(scriptConfig.dataKey));
+  const list = JSON.parse(localStorage.getItem(scriptConfig.dataKey)) | [];
   for (let i = list.length - 1; i >= 0; i--) {
     let e = list[i];
     createSessionItem(e.time, e.session_hash);
