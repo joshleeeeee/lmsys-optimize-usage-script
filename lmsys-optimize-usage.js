@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         lmsys-enhancer
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.7
 // @description  Optimize your experience on the chat.lmsys.org with the `lmsys-enhancer` Tampermonkey script.
 // @author       joshlee
 // @match        https://chat.lmsys.org/
@@ -23,8 +23,9 @@ const scriptConfig = {
     main: "#component-1",
     changeModel: "#model_selector_row label",
     directChat: ".tab-nav.scroll-hide button:nth-child(3)",
-    maxOutputTokenInputs: "#component-100 input",
-    sendBtn: "#component-89",
+    maxOutputTokenInput: "//span[text()='Max output tokens']/../../input",
+    maxOutputTokenBar: "//span[text()='Max output tokens']/../../../../input",
+    sendBtn: '//button[text()="Send"]',
     unnecessaryList: ["#component-93", "#component-83"],
   },
 };
@@ -32,6 +33,21 @@ const scriptConfig = {
 const originalSend = WebSocket.prototype.send;
 
 var itemList;
+
+function $x(xpathToExecute) {
+  var result = [];
+  var nodesSnapshot = document.evaluate(
+    xpathToExecute,
+    document,
+    null,
+    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+    null
+  );
+  for (var i = 0; i < nodesSnapshot.snapshotLength; i++) {
+    result.push(nodesSnapshot.snapshotItem(i));
+  }
+  return result;
+}
 
 function removeUselessElements() {
   // Remove unnecessary notices and components
@@ -46,19 +62,20 @@ function removeUselessElements() {
 
 function setMaxOutputToken(maxValue = 4096) {
   // Set the maximum token output to the desired value
-  const maxOutputTokenInputs = document.querySelectorAll(
-    scriptConfig.position.maxOutputTokenInputs
-  );
-  if (maxOutputTokenInputs.length >= 2) {
-    maxOutputTokenInputs[1].max = String(maxValue);
-    maxOutputTokenInputs[0].value = String(maxValue);
-    maxOutputTokenInputs[1].value = String(maxValue);
-    const changeEvent = new Event("change", {
-      bubbles: true,
-      cancelable: true,
-    });
-    maxOutputTokenInputs[1].dispatchEvent(changeEvent);
+  const [, , input] = $x(scriptConfig.position.maxOutputTokenInput);
+  const [, , bar] = $x(scriptConfig.position.maxOutputTokenBar);
+
+  if (!input || !bar) {
+    console.error("Set max output token failure!");
+    return;
   }
+
+  input.value = String(maxValue);
+  bar.max = String(maxValue);
+  bar.value = String(maxValue);
+
+  const changeEvent = new Event("change", { bubbles: true, cancelable: true });
+  bar.dispatchEvent(changeEvent);
 }
 
 function changeModel(model) {
@@ -141,7 +158,7 @@ function createSessionItem(text, sessionHash) {
   });
   toggleButton.addEventListener("click", function () {
     scriptConfig.currentSessionHash = sessionHash;
-    document.querySelector(scriptConfig.position.sendBtn).click(); // send
+    clickSendBtn();
   });
   itemContainer.appendChild(toggleButton);
 
@@ -285,7 +302,7 @@ function handleNewChatClick() {
   scriptConfig.firstMeetSessionHash = true;
   scriptConfig.firstSend = true;
   scriptConfig.loadLatestSession = false;
-  document.querySelector(scriptConfig.position.sendBtn).click(); // send
+  clickSendBtn();
 }
 
 // Update the highlighted state of the session list
@@ -321,7 +338,7 @@ function toggleLastestSession() {
 
 function loadSessionHashHistory() {
   itemList.innerHTML = "";
-  const list = JSON.parse(localStorage.getItem(scriptConfig.dataKey)) | [];
+  const list = JSON.parse(localStorage.getItem(scriptConfig.dataKey)) || [];
   for (let i = list.length - 1; i >= 0; i--) {
     let e = list[i];
     createSessionItem(e.time, e.session_hash);
@@ -345,6 +362,10 @@ function removeSessionHash(targetSessionHash) {
     (item) => item.session_hash !== targetSessionHash
   );
   localStorage.setItem(scriptConfig.dataKey, JSON.stringify(filteredList));
+}
+
+function clickSendBtn() {
+  $x(scriptConfig.position.sendBtn)[2].click();
 }
 
 function saveCurrentSession() {
